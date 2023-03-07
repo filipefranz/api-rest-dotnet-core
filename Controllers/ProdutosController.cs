@@ -8,27 +8,41 @@ using api_rest_dotnet_core.Models;
 using api_rest_dotnet_core.Models.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using api_rest_dotnet_core.HATEOAS;
 
 namespace api_rest_dotnet_core.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/v1/[controller]")]
     [ApiController]
     public class ProdutosController : ControllerBase
     {
         private readonly ILogger<ProdutosController> _logger;
         private readonly ApplicationDbContext _database;
+        private HATEOAS.HATEOAS HATEOAS;
 
         public ProdutosController(ILogger<ProdutosController> logger, ApplicationDbContext database)
         {
             _logger = logger;
             _database = database;
+            HATEOAS = new HATEOAS.HATEOAS("localhost:5238/api/v1/Produtos");
+            HATEOAS.AddAction("GET_INFO", "GET");
+            HATEOAS.AddAction("DELETE_PRODUCT", "DELETE");
+            HATEOAS.AddAction("EDIT_PRODUCT", "PATCH");
         }
 
         [HttpGet]
         public IActionResult Get()
         {
             var lista = _database.Produtos?.ToList();
-            return Ok(lista);
+            List<ProdutoContainer> produtosHateoas = new List<ProdutoContainer>();
+            foreach (var item in lista)
+            {
+                ProdutoContainer produtoContainer = new ProdutoContainer();
+                produtoContainer.produto = item;
+                produtoContainer.links = HATEOAS.GetActions(item.Id.ToString());
+                produtosHateoas.Add(produtoContainer);
+            }
+            return Ok(produtosHateoas);
         }
 
         [HttpGet("{id}")]
@@ -37,7 +51,11 @@ namespace api_rest_dotnet_core.Controllers
             try
             {
                 var produto = _database.Produtos?.First(p => p.Id == id);
-                return Ok(produto);
+                ProdutoContainer produtoHATEOAS = new ProdutoContainer();
+                produtoHATEOAS.produto = produto;
+                produtoHATEOAS.links = HATEOAS.GetActions(produto.Id.ToString());
+                // return Ok(produto);
+                return Ok(produtoHATEOAS);
             }
             catch (Exception)
             {
@@ -45,9 +63,52 @@ namespace api_rest_dotnet_core.Controllers
             }
         }
 
+        [HttpPatch]
+        public IActionResult Patch([FromBody] Produto produtoEnviado)
+        {
+            if (produtoEnviado.Id > 0)
+            {
+                try
+                {
+                    var produto = _database.Produtos?.FirstOrDefault(p => p.Id == produtoEnviado.Id);
+
+                    if (produto != null)
+                    {
+                        produto.Nome = produtoEnviado.Nome != null ? produtoEnviado.Nome : produto.Nome;
+                        produto.Preco = produtoEnviado.Preco >= 0 ? produtoEnviado.Preco : produto.Preco;
+                        _database.SaveChanges();
+                        return Ok(produto); 
+                    } else {
+                        Response.StatusCode = 400;
+                        return new ObjectResult(new {msg = "Produto não encontrado"});
+                    }
+                }
+                catch (Exception)
+                {
+                    Response.StatusCode = 400;
+                    return new ObjectResult(new {msg = "Produto não encontrado"});
+                }
+            } else {
+                Response.StatusCode = 400;
+                return new ObjectResult(new {msg = "O Id é inválido"});
+            }
+        }
+
         [HttpPost]
         public IActionResult Post([FromBody] ProdutoDTO p)
         {
+            if (p.Preco <= 0)
+            {
+                Response.StatusCode = 400;
+                return new ObjectResult(new {msg = "O preço não pode ser menor ou igual a zero" });
+            }
+
+            if (p.Nome.Length <= 1)
+            {
+                Response.StatusCode = 400;
+                return new ObjectResult(new {msg = "Nome deve conter pelo menos uma caracter" });
+            }
+
             Produto produto = new Produto();
             produto.Nome = p.Nome;
             produto.Preco = p.Preco;
@@ -57,7 +118,6 @@ namespace api_rest_dotnet_core.Controllers
 
             Response.StatusCode = 201;
             return new ObjectResult(new { info = "Criado novo produto", produto = p });
-            // return Ok(new { info = "Criado novo produto", produto = p });
         }
 
         [HttpDelete("{id}")]

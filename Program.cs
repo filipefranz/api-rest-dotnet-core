@@ -13,7 +13,9 @@ internal class Program
         builder.Services.AddControllers();
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
         builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
+        builder.Services.AddSwaggerGen(config => {
+            config.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title="API DE PRODUTOS", Version ="v1"});
+        });
         builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
         var app = builder.Build();
