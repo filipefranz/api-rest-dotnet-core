@@ -9,11 +9,13 @@ using api_rest_dotnet_core.Models.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using api_rest_dotnet_core.HATEOAS;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api_rest_dotnet_core.Controllers
 {
     [Route("api/v1/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin")]
     public class ProdutosController : ControllerBase
     {
         private readonly ILogger<ProdutosController> _logger;
@@ -43,6 +45,13 @@ namespace api_rest_dotnet_core.Controllers
                 produtosHateoas.Add(produtoContainer);
             }
             return Ok(produtosHateoas);
+        }
+
+        [HttpGet("teste-claim")]
+        public IActionResult TesteClaims()
+        {
+            var claim = HttpContext.User.Claims.First(claim => claim.Type.ToString().Equals("id", StringComparison.CurrentCultureIgnoreCase)).Value;
+            return Ok(claim);
         }
 
         [HttpGet("{id}")]

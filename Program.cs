@@ -1,5 +1,9 @@
+using System.Text;
 using api_rest_dotnet_core.Data;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 internal class Program
 {
@@ -7,6 +11,8 @@ internal class Program
     {
         var builder = WebApplication.CreateBuilder(args);
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+        string chaveDeseguranca = "chave_teste_65437658@";
+        var chaveSimetrica = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(chaveDeseguranca));
 
         // Add services to the container.
 
@@ -18,6 +24,20 @@ internal class Program
         });
         builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
+        // Informando ao sistema que JWT como forma de autenticação
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options => {
+            // Como o sistema deve ler o Token
+            options.TokenValidationParameters = new TokenValidationParameters{
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateIssuerSigningKey = true,
+                // Dados de validação de um JWT
+                ValidIssuer = "meuSistema.com",
+                ValidAudience = "usuario_comum",
+                IssuerSigningKey = chaveSimetrica
+            };
+        });
+
         var app = builder.Build();
 
         // Configure the HTTP request pipeline.
@@ -28,7 +48,7 @@ internal class Program
         }
 
         app.UseHttpsRedirection();
-
+        app.UseAuthentication(); // Aplica o sistema de autenticação na aplicação
         app.UseAuthorization();
 
         app.MapControllers();
